@@ -1,0 +1,13 @@
+{
+  "iconDefinitions": {
+    "_file_prady": {
+      "iconPath": "./prady-file-icon.png"
+    }
+  },
+  "fileExtensions": {
+    "pr": "_file_prady"
+  },
+  "languageIds": {
+    "prady": "_file_prady"
+  }
+}

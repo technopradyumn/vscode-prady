@@ -40,7 +40,18 @@
         "id": "prady",
         "aliases": ["Prady", "prady"],
         "extensions": [".pr"],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/prady-file-icon.png",
+          "dark": "./icons/prady-file-icon.png"
+        }
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "prady-icons",
+        "label": "Prady File Icons",
+        "path": "./icons/prady-icon-theme.json"
       }
     ],
     "grammars": [
