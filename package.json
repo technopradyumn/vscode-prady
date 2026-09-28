@@ -1,8 +1,8 @@
 {
   "name": "prady-lang",
   "displayName": "Prady Language",
-  "description": "Rich language support, syntax highlighting, diagnostics problem matchers, snippets, and execution for the Prady programming language (.pr)",
-  "version": "0.1.1",
+  "description": "Full IDE support for Prady (.pr) — diagnostics, go-to-definition (Ctrl+Click), hover, auto-complete, symbols, run & check commands",
+  "version": "1.0.0",
   "publisher": "technopradyumn",
   "license": "MIT OR Apache-2.0",
   "icon": "icon.png",
@@ -11,29 +11,22 @@
     "url": "https://github.com/technopradyumn/vscode-prady"
   },
   "homepage": "https://github.com/technopradyumn/vscode-prady",
-  "bugs": {
-    "url": "https://github.com/technopradyumn/vscode-prady/issues"
-  },
-  "engines": {
-    "vscode": "^1.75.0"
-  },
+  "bugs": { "url": "https://github.com/technopradyumn/vscode-prady/issues" },
+  "engines": { "vscode": "^1.75.0" },
+  "main": "./extension.js",
   "scripts": {
     "package": "vsce package",
-    "publish": "vsce publish",
-    "publish:ovsx": "ovsx publish"
+    "publish": "vsce publish"
   },
-  "categories": [
-    "Programming Languages",
-    "Snippets",
-    "Linters"
-  ],
-  "keywords": [
-    "prady",
-    "pr",
-    "systems programming",
-    "syntax highlighting",
-    "architecture-as-code"
-  ],
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.22.0"
+  },
+  "categories": ["Programming Languages", "Snippets", "Linters"],
+  "keywords": ["prady", "pr", "systems programming", "syntax highlighting", "architecture-as-code"],
+  "activationEvents": ["onLanguage:prady"],
   "contributes": {
     "languages": [
       {
@@ -43,7 +36,7 @@
         "configuration": "./language-configuration.json",
         "icon": {
           "light": "./icons/prady-file-icon.png",
-          "dark": "./icons/prady-file-icon.png"
+          "dark":  "./icons/prady-file-icon.png"
         }
       }
     ],
@@ -62,16 +55,89 @@
       }
     ],
     "snippets": [
+      { "language": "prady", "path": "./snippets/prady.json" }
+    ],
+    "commands": [
       {
-        "language": "prady",
-        "path": "./snippets/prady.json"
+        "command": "prady.runFile",
+        "title": "Prady: Run File",
+        "icon": "$(play)"
+      },
+      {
+        "command": "prady.checkFile",
+        "title": "Prady: Check File",
+        "icon": "$(check)"
+      },
+      {
+        "command": "prady.showAst",
+        "title": "Prady: Show AST"
+      },
+      {
+        "command": "prady.showOutput",
+        "title": "Prady: Show LSP Output"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "prady.runFile",
+          "when": "resourceLangId == prady",
+          "group": "navigation"
+        },
+        {
+          "command": "prady.checkFile",
+          "when": "resourceLangId == prady",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "prady.runFile",
+          "when": "resourceLangId == prady",
+          "group": "prady"
+        },
+        {
+          "command": "prady.checkFile",
+          "when": "resourceLangId == prady",
+          "group": "prady"
+        },
+        {
+          "command": "prady.showAst",
+          "when": "resourceLangId == prady",
+          "group": "prady"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Prady",
+      "properties": {
+        "prady.executablePath": {
+          "type": "string",
+          "default": "prady",
+          "description": "Path to the prady CLI executable"
+        },
+        "prady.lspServerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the prady-lsp binary (leave empty for auto-detection)"
+        },
+        "prady.enableInlayHints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inlay type hints for let bindings"
+        },
+        "prady.formatOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run formatter on save (when formatter is available)"
+        }
+      }
+    },
     "problemMatchers": [
       {
         "name": "prady",
         "owner": "prady",
-        "fileLocation": ["relative", "${workspaceFolder}"],
+        "fileLocation": ["autoDetect", "${workspaceFolder}"],
         "pattern": [
           {
             "regexp": "^(error|warning)(?:\\[([^\\]]+)\\])?:\\s*(.*)$",
@@ -80,13 +146,30 @@
             "message": 3
           },
           {
-            "regexp": "^\\s*-->\\s*(.*):(\\d+):(\\d+)$",
+            "regexp": "^\\s*-->\\s*(.*?):(\\d+):(\\d+)$",
             "file": 1,
             "line": 2,
             "column": 3,
             "loop": true
           }
         ]
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "prady",
+        "required": ["task"],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "Prady task to run",
+            "enum": ["run", "check", "test", "ast"]
+          },
+          "file": {
+            "type": "string",
+            "description": "Target .pr file"
+          }
+        }
       }
     ]
   }

@@ -1,81 +1,139 @@
 {
-  "Function": {
-    "prefix": "fn",
-    "body": [
-      "fn ${1:name}(${2:params}) -> ${3:Void} {",
-      "    $0",
-      "}"
-    ],
-    "description": "Define a Prady function"
+  "Function Declaration": {
+    "prefix": ["fn", "func"],
+    "body": ["fn ${1:name}(${2:params}) -> ${3:ReturnType} {", "\t$0", "}"],
+    "description": "Declare a function"
+  },
+  "Async Function Declaration": {
+    "prefix": ["afn", "async fn"],
+    "body": ["async fn ${1:name}(${2:params}) -> ${3:ReturnType} {", "\t$0", "}"],
+    "description": "Declare an async function"
   },
   "Main Function": {
     "prefix": "main",
-    "body": [
-      "fn main() {",
-      "    $0",
-      "}"
-    ],
-    "description": "Prady main entry point"
+    "body": ["fn main() {", "\t$0", "}"],
+    "description": "Entry point main function"
   },
-  "Let Variable": {
+  "Let Binding": {
     "prefix": "let",
-    "body": [
-      "let ${1:name}: ${2:Type} = ${3:value};"
-    ],
-    "description": "Immutable variable declaration"
+    "body": ["let ${1:name}: ${2:Type} = $0;"],
+    "description": "Immutable variable binding"
   },
-  "Let Mutable Variable": {
-    "prefix": "letmut",
-    "body": [
-      "let mut ${1:name}: ${2:Type} = ${3:value};"
-    ],
-    "description": "Mutable variable declaration"
+  "Mutable Let Binding": {
+    "prefix": "letm",
+    "body": ["let mut ${1:name}: ${2:Type} = $0;"],
+    "description": "Mutable variable binding"
   },
-  "Print": {
-    "prefix": "print",
-    "body": [
-      "print(${1:\"Hello Prady\"});"
-    ],
-    "description": "Print to standard output"
+  "Const Declaration": {
+    "prefix": "const",
+    "body": ["const ${1:NAME}: ${2:Type} = $0;"],
+    "description": "Constant declaration"
   },
-  "Architecture Block": {
-    "prefix": "arch",
+  "Class Declaration": {
+    "prefix": ["class", "cls"],
     "body": [
-      "architecture ${1:SystemName} {",
-      "    layer ${2:presentation};",
-      "    layer ${3:domain};",
-      "    layer ${4:data};",
-      "    $0",
+      "class ${1:ClassName} {",
+      "\tlet ${2:field}: ${3:Type} = $4;",
+      "",
+      "\tfn ${5:method}() {",
+      "\t\t$0",
+      "\t}",
       "}"
     ],
-    "description": "Define Architecture as Code"
+    "description": "Declare a class with fields and methods"
   },
-  "Struct": {
+  "Struct Declaration": {
     "prefix": "struct",
     "body": [
       "struct ${1:Name} {",
-      "    ${2:field}: ${3:Type},",
+      "\t${2:field}: ${3:Type},",
+      "\t$0",
       "}"
     ],
-    "description": "Define a struct"
+    "description": "Declare a struct"
   },
-  "Interface": {
+  "If Statement": {
+    "prefix": "if",
+    "body": ["if ${1:condition} {", "\t$0", "}"],
+    "description": "If statement"
+  },
+  "If-Else Statement": {
+    "prefix": "ife",
+    "body": ["if ${1:condition} {", "\t$2", "} else {", "\t$0", "}"],
+    "description": "If-else statement"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": ["while ${1:condition} {", "\t$0", "}"],
+    "description": "While loop"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": ["for ${1:item} in ${2:iterable} {", "\t$0", "}"],
+    "description": "For-in loop"
+  },
+  "Loop": {
+    "prefix": "loop",
+    "body": ["loop {", "\t$0", "\tbreak;", "}"],
+    "description": "Infinite loop with break"
+  },
+  "Match Expression": {
+    "prefix": "match",
+    "body": [
+      "match ${1:value} {",
+      "\t${2:pattern} => $3,",
+      "\t_ => $0,",
+      "}"
+    ],
+    "description": "Match expression"
+  },
+  "Import Statement": {
+    "prefix": "import",
+    "body": ["import ${1:Module};"],
+    "description": "Import a module"
+  },
+  "Return Statement": {
+    "prefix": "ret",
+    "body": ["return $0;"],
+    "description": "Return statement"
+  },
+  "Print Statement": {
+    "prefix": "print",
+    "body": ["print(${1:\"value\"});"],
+    "description": "Print to stdout"
+  },
+  "Architecture Block": {
+    "prefix": ["arch", "architecture"],
+    "body": [
+      "architecture ${1:AppName} {",
+      "\tlayer ${2:presentation};",
+      "\tlayer ${3:application};",
+      "\tlayer ${4:domain};",
+      "",
+      "\t${2:presentation} -> ${3:application};",
+      "\t${3:application} -> ${4:domain};",
+      "\t${4:domain} cannot import ${2:presentation};",
+      "}"
+    ],
+    "description": "Architecture block with layers and rules"
+  },
+  "Interface Declaration": {
     "prefix": "interface",
     "body": [
       "interface ${1:Name} {",
-      "    fn ${2:method}(${3:params}) -> ${4:ReturnType};",
+      "\tfn ${2:method}(${3:params}) -> ${4:ReturnType};",
       "}"
     ],
-    "description": "Define an interface"
+    "description": "Declare an interface"
   },
-  "Unit Test": {
-    "prefix": "test",
+  "Enum Declaration": {
+    "prefix": "enum",
     "body": [
-      "@test",
-      "fn test_${1:name}() {",
-      "    assert(${2:condition});",
+      "enum ${1:Name} {",
+      "\t${2:Variant1},",
+      "\t${3:Variant2}($4),",
       "}"
     ],
-    "description": "Define a Prady unit test"
+    "description": "Declare an enum"
   }
 }

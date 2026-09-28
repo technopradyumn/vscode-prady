@@ -7,6 +7,7 @@
     { "include": "#strings" },
     { "include": "#annotations" },
     { "include": "#keywords" },
+    { "include": "#class-declarations" },
     { "include": "#types" },
     { "include": "#constants" },
     { "include": "#function-declarations" },
@@ -67,15 +68,15 @@
       "patterns": [
         {
           "name": "keyword.control.prady",
-          "match": "\\b(if|else|while|for|in|return|break|continue|match|yield|try|catch|throw)\\b"
+          "match": "\\b(if|else|while|for|foreach|of|in|switch|case|default|loop|return|break|continue|match|yield|try|catch|throw)\\b"
         },
         {
           "name": "keyword.declaration.prady",
-          "match": "\\b(fn|let|mut|const|struct|interface|class|trait|enum|type|architecture|layer|spec|contract|impl)\\b"
+          "match": "\\b(fn|let|mut|const|struct|interface|class|trait|enum|type|architecture|layer|spec|contract|impl|abstract)\\b"
         },
         {
           "name": "keyword.other.prady",
-          "match": "\\b(pub|private|protected|static|abstract|async|await|use|import|export|requires|ensures|invariant|where)\\b"
+          "match": "\\b(pub|private|protected|static|async|await|use|import|export|module|using|extends|implements|cannot|requires|ensures|invariant|where)\\b"
         }
       ]
     },
@@ -87,7 +88,7 @@
         },
         {
           "name": "support.type.container.prady",
-          "match": "\\b(Option|Result|Array|List|Map|Set|Vec|Tuple)\\b"
+          "match": "\\b(Option|Result|Array|List|Map|Set|Vec|Tuple|Stack|Queue|Deque|MinHeap|MaxHeap|LinkedList|DoublyLinkedList|BST|AVLTree|RedBlackTree|Trie|Graph|LRUCache|LFUCache|CircularBuffer|BloomFilter|DisjointSet|SegmentTree|FenwickTree|BitSet|SkipList|Matrix|SparseMatrix|TreeMap|TreeSet)\\b"
         },
         {
           "name": "entity.name.type.prady",
@@ -107,7 +108,18 @@
         },
         {
           "name": "support.function.builtin.prady",
-          "match": "\\b(print|println|assert|panic|len|sizeof)\\b"
+          "match": "\\b(print|println|assert|panic|len|sizeof|type_of|input|format)\\b"
+        }
+      ]
+    },
+    "class-declarations": {
+      "patterns": [
+        {
+          "match": "\\b(class|struct)\\s+([A-Z][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.declaration.prady" },
+            "2": { "name": "entity.name.class.prady" }
+          }
         }
       ]
     },
