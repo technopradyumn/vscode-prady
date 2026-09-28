@@ -2,7 +2,7 @@
   "name": "prady-lang",
   "displayName": "Prady Language",
   "description": "Rich language support, syntax highlighting, diagnostics problem matchers, snippets, and execution for the Prady programming language (.pr)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "technopradyumn",
   "license": "MIT OR Apache-2.0",
   "icon": "icon.png",
