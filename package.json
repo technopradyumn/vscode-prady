@@ -1,0 +1,82 @@
+{
+  "name": "prady-lang",
+  "displayName": "Prady Language",
+  "description": "Rich language support, syntax highlighting, diagnostics problem matchers, snippets, and execution for the Prady programming language (.pr)",
+  "version": "0.1.0",
+  "publisher": "technopradyumn",
+  "license": "MIT OR Apache-2.0",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/technopradyumn/vscode-prady"
+  },
+  "homepage": "https://github.com/technopradyumn/vscode-prady",
+  "bugs": {
+    "url": "https://github.com/technopradyumn/vscode-prady/issues"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "scripts": {
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "publish:ovsx": "ovsx publish"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters"
+  ],
+  "keywords": [
+    "prady",
+    "pr",
+    "systems programming",
+    "syntax highlighting",
+    "architecture-as-code"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "prady",
+        "aliases": ["Prady", "prady"],
+        "extensions": [".pr"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "prady",
+        "scopeName": "source.prady",
+        "path": "./syntaxes/prady.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "prady",
+        "path": "./snippets/prady.json"
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "prady",
+        "owner": "prady",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": [
+          {
+            "regexp": "^(error|warning)(?:\\[([^\\]]+)\\])?:\\s*(.*)$",
+            "severity": 1,
+            "code": 2,
+            "message": 3
+          },
+          {
+            "regexp": "^\\s*-->\\s*(.*):(\\d+):(\\d+)$",
+            "file": 1,
+            "line": 2,
+            "column": 3,
+            "loop": true
+          }
+        ]
+      }
+    ]
+  }
+}

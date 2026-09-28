@@ -1,0 +1,74 @@
+# GitHub Actions: CI + Release for the vscode-prady extension
+# CI: runs on every push/PR — validates the package.json and packages the extension.
+# Release: triggered by a tag like v0.3.0 — publishes to VS Code Marketplace and Open VSX.
+
+name: Extension CI & Release
+
+on:
+  push:
+    branches: ["main"]
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  # ─── 1. Validate & package on every push ─────────────────────────────────
+  package:
+    name: Package extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install vsce and ovsx
+        run: npm install -g @vscode/vsce ovsx
+
+      - name: Package .vsix
+        run: vsce package --allow-missing-repository --no-git-tag-version --out prady-lang.vsix
+
+      - name: Upload .vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prady-lang-vsix
+          path: prady-lang.vsix
+
+  # ─── 2. Publish to both stores on tag push ────────────────────────────────
+  publish:
+    name: Publish to Marketplace & Open VSX
+    runs-on: ubuntu-latest
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: extension-publishing   # create this env in repo Settings → Environments
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install vsce and ovsx
+        run: npm install -g @vscode/vsce ovsx
+
+      # Secrets needed:
+      #   VSCE_PAT   — Personal Access Token from https://dev.azure.com (Full Access, Marketplace scope)
+      #   OVSX_PAT   — Token from https://open-vsx.org/user-settings/tokens
+      # Add both in: repo Settings → Secrets and variables → Actions
+
+      - name: Publish to VS Code Marketplace
+        run: vsce publish --pat "${{ secrets.VSCE_PAT }}"
+
+      - name: Publish to Open VSX
+        run: ovsx publish prady-lang.vsix --pat "${{ secrets.OVSX_PAT }}"
+
+      - name: Upload .vsix to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: prady-lang.vsix

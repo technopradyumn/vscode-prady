@@ -1,0 +1,81 @@
+{
+  "Function": {
+    "prefix": "fn",
+    "body": [
+      "fn ${1:name}(${2:params}) -> ${3:Void} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Define a Prady function"
+  },
+  "Main Function": {
+    "prefix": "main",
+    "body": [
+      "fn main() {",
+      "    $0",
+      "}"
+    ],
+    "description": "Prady main entry point"
+  },
+  "Let Variable": {
+    "prefix": "let",
+    "body": [
+      "let ${1:name}: ${2:Type} = ${3:value};"
+    ],
+    "description": "Immutable variable declaration"
+  },
+  "Let Mutable Variable": {
+    "prefix": "letmut",
+    "body": [
+      "let mut ${1:name}: ${2:Type} = ${3:value};"
+    ],
+    "description": "Mutable variable declaration"
+  },
+  "Print": {
+    "prefix": "print",
+    "body": [
+      "print(${1:\"Hello Prady\"});"
+    ],
+    "description": "Print to standard output"
+  },
+  "Architecture Block": {
+    "prefix": "arch",
+    "body": [
+      "architecture ${1:SystemName} {",
+      "    layer ${2:presentation};",
+      "    layer ${3:domain};",
+      "    layer ${4:data};",
+      "    $0",
+      "}"
+    ],
+    "description": "Define Architecture as Code"
+  },
+  "Struct": {
+    "prefix": "struct",
+    "body": [
+      "struct ${1:Name} {",
+      "    ${2:field}: ${3:Type},",
+      "}"
+    ],
+    "description": "Define a struct"
+  },
+  "Interface": {
+    "prefix": "interface",
+    "body": [
+      "interface ${1:Name} {",
+      "    fn ${2:method}(${3:params}) -> ${4:ReturnType};",
+      "}"
+    ],
+    "description": "Define an interface"
+  },
+  "Unit Test": {
+    "prefix": "test",
+    "body": [
+      "@test",
+      "fn test_${1:name}() {",
+      "    assert(${2:condition});",
+      "}"
+    ],
+    "description": "Define a Prady unit test"
+  }
+}
