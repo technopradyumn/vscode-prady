@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="icon.png" width="80" alt="Prady Language Logo" />
+<img src="prady-logo.svg" width="80" alt="Prady Language Logo" />
 
 # Prady Language Support for VS Code
 
 **Full IDE support for the Prady Programming Language (`.pr`)**
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)](https://github.com/technopradyumn/vscode-prady/releases)
+[![Version](https://img.shields.io/badge/version-1.0.2-blue?style=flat-square)](https://github.com/technopradyumn/vscode-prady/releases)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green?style=flat-square)](LICENSE)
 [![Website](https://img.shields.io/badge/website-pradylang.vercel.app-indigo?style=flat-square)](https://pradylang.vercel.app)
 
@@ -25,9 +25,10 @@
 | Feature | Details |
 |---|---|
 | 🎨 **Syntax Highlighting** | Keywords, types, functions, comments, decorators (`@test`), architecture blocks (`architecture`, `layer`, `spec`) |
-| ⚡ **Code Runner** | Press `Ctrl+Alt+N` or click the ▶ button in the editor title bar to run `.pr` files with `prady run` |
-| 🔍 **Live Diagnostics** | Error and warning squiggles with precise source spans via the LSP and problem matchers |
-| 🔵 **LSP Integration** | Hover type info, go-to-definition (`Ctrl+Click`), auto-complete, and document symbols |
+| ⚡ **Code Runner** | Click the ▶ button to run `.pr` files in an interactive terminal; output and runtime errors also appear in editor diagnostics |
+| 🔍 **Diagnostics** | Syntax/parser and unresolved local import diagnostics update while editing; save or run `Prady: Check File` to refresh compiler diagnostics |
+| 🔵 **LSP Integration** | Hover and go-to-definition where supported, workspace class/function completions, local member suggestions, and relative auto-imports |
+| 🎨 **Formatting** | Run `Format Document` to use `prady fmt`; enable it on save with VS Code's `[prady]` editor setting |
 | 💡 **Snippets** | Quick expansions for `fn`, `main`, `let`, `letmut`, `arch`, `struct`, and `@test` |
 | 📐 **Smart Editing** | Auto-closing brackets, `//` line comments, smart indentation, and bracket colorization |
 | 🏷️ **File Icons** | Custom `.pr` file icon in the Explorer sidebar |
@@ -96,8 +97,16 @@ Configure in VS Code Settings (`Ctrl+,`):
 |---|---|---|
 | `prady.executablePath` | `"prady"` | Path to the `prady` CLI binary |
 | `prady.lspServerPath` | `""` | Path to `prady-lsp` (auto-detected if empty) |
-| `prady.enableInlayHints` | `true` | Show inlay type hints for `let` bindings |
-| `prady.formatOnSave` | `false` | Run formatter on save (when available) |
+
+Format with **Format Document**. To format when saving, configure VS Code's standard setting:
+
+```json
+"[prady]": { "editor.formatOnSave": true }
+```
+
+The current compiler does not implement full static type checking. The extension reports diagnostics the parser/compiler actually emit and cannot detect every undefined name or type mismatch before execution. It only proposes project imports that map to files it can resolve; documented standard-library namespaces without source modules are not invented as auto-imports.
+
+For the latest diagnostics, completions, formatting, and runner fixes, install **Prady Language 1.0.2 or newer** and restart VS Code. The extension can use the bundled CLI when a matching platform binary is present; otherwise install Prady separately or set `prady.executablePath`.
 
 ---
 

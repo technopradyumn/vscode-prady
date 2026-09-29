@@ -1,17 +1,26 @@
-// Prady Language Extension for VS Code (v1.0.0 GA)
+// Prady Language Extension for VS Code (v1.0.2)
 // Real-time diagnostics, go-to-definition, hover, autocomplete, symbols, and CLI runner.
 // Auto-import on completion selection, unused-import diagnostics, dot-access member completions.
 
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const cp = require('child_process');
+const {
+  extractWorkspaceDeclarations,
+  getMemberSignatures,
+  inferReceiverType,
+  modulePathFor,
+  parseCliDiagnostics,
+} = require('./languageFeatures');
 
 let diagnosticCollection;
 let lspProcess = null;
+let extensionDirectory = '';
 let rpcId = 1;
 const pendingRequests = new Map();
-let incomingBuffer = '';
+let incomingBuffer = Buffer.alloc(0);
 
 // ─── Standard Library Catalogue ────────────────────────────────────────────
 // Each entry: { module, members[], description, kind }
@@ -173,12 +182,30 @@ const STDLIB = [
   ]},
 ];
 
+// Offer only built-ins implemented by the current compiler/runtime.
+STDLIB.splice(0, STDLIB.length, {
+  module: null,
+  members: [
+    { name: 'print', kind: 'function', sig: 'fn print(value: Any)', doc: 'Print a value to stdout' },
+    { name: 'println', kind: 'function', sig: 'fn println(value: Any)', doc: 'Print a value with newline' },
+    { name: 'len', kind: 'function', sig: 'fn len(value: Any) -> Int', doc: 'Return the length of a collection or string' },
+    { name: 'assert', kind: 'function', sig: 'fn assert(condition: Bool, message: String)', doc: 'Assert a condition' },
+    { name: 'type_of', kind: 'function', sig: 'fn type_of(value: Any) -> String', doc: 'Return the runtime type name' },
+    ...['Map', 'HashMap', 'Set', 'HashSet', 'Stack', 'Queue', 'Deque', 'MinHeap', 'PriorityQueue', 'MaxHeap', 'LinkedList', 'DoublyLinkedList', 'BST', 'BinarySearchTree', 'AVLTree', 'RedBlackTree', 'Trie', 'Graph', 'LRUCache', 'LFUCache', 'CircularBuffer', 'BloomFilter', 'DisjointSet', 'UnionFind', 'SegmentTree', 'FenwickTree', 'BitSet', 'SkipList', 'Matrix', 'SparseMatrix', 'TreeMap', 'TreeSet'].map((name) => ({
+      name,
+      kind: 'class',
+      sig: `class ${name}`,
+      doc: `Built-in ${name} data structure`,
+    })),
+  ],
+});
+
 // Build flat lookup maps
-const MODULE_NAMES = STDLIB.map(m => m.module);
+const MODULE_NAMES = STDLIB.filter(m => m.module).map(m => m.module);
 const MEMBER_MAP = {}; // module -> member[]
 const ALL_MEMBERS = []; // { module, member } for global search
 for (const lib of STDLIB) {
-  MEMBER_MAP[lib.module] = lib.members;
+  if (lib.module) MEMBER_MAP[lib.module] = lib.members;
   for (const m of lib.members) {
     ALL_MEMBERS.push({ module: lib.module, member: m });
   }
@@ -280,41 +307,6 @@ function detectUnusedImports(document) {
   return diags;
 }
 
-/**
- * Detect unimported usages: member used but module not imported.
- */
-function detectMissingImports(document) {
-  const text = document.getText();
-  const diags = [];
-  const alreadyFlagged = new Set();
-
-  for (const { module, member } of ALL_MEMBERS) {
-    if (isImported(document, module)) continue;
-
-    // Check if the member name is used (as a call or reference)
-    const re = new RegExp(`\\b${member.name}\\s*[\\(\\[]`, 'g');
-    let m;
-    while ((m = re.exec(text)) !== null) {
-      const pos = document.positionAt(m.index);
-      const key = `${pos.line}:${pos.character}:${member.name}`;
-      if (alreadyFlagged.has(key)) continue;
-      alreadyFlagged.add(key);
-
-      const range = new vscode.Range(pos, new vscode.Position(pos.line, pos.character + member.name.length));
-      const diag = new vscode.Diagnostic(
-        range,
-        `'${member.name}' is from module '${module}' — add 'import ${module};' at the top.`,
-        vscode.DiagnosticSeverity.Error
-      );
-      diag.source = 'prady';
-      diag.code = 'E0100';
-      diags.push(diag);
-    }
-  }
-
-  return diags;
-}
-
 // ─── LSP Helpers ────────────────────────────────────────────────────────────
 
 function findLspBinary(context) {
@@ -360,6 +352,8 @@ function findCliBinary() {
     const cargoBin = path.join(home, '.cargo', 'bin', binName);
     if (fs.existsSync(cargoBin)) return cargoBin;
   }
+  const bundled = path.join(extensionDirectory, binName);
+  if (fs.existsSync(bundled)) return bundled;
   return 'prady';
 }
 
@@ -385,18 +379,18 @@ function requestRpc(method, params) {
 }
 
 function handleIncomingData(data, outputChannel) {
-  incomingBuffer += data.toString('utf8');
+  incomingBuffer = Buffer.concat([incomingBuffer, Buffer.isBuffer(data) ? data : Buffer.from(data)]);
   while (true) {
     const headerEnd = incomingBuffer.indexOf('\r\n\r\n');
     if (headerEnd === -1) break;
-    const header = incomingBuffer.substring(0, headerEnd);
+    const header = incomingBuffer.subarray(0, headerEnd).toString('ascii');
     const match = header.match(/Content-Length:\s*(\d+)/i);
-    if (!match) { incomingBuffer = incomingBuffer.substring(headerEnd + 4); continue; }
+    if (!match) { incomingBuffer = incomingBuffer.subarray(headerEnd + 4); continue; }
     const length = parseInt(match[1], 10);
     const bodyStart = headerEnd + 4;
     if (incomingBuffer.length < bodyStart + length) break;
-    const bodyStr = incomingBuffer.substring(bodyStart, bodyStart + length);
-    incomingBuffer = incomingBuffer.substring(bodyStart + length);
+    const bodyStr = incomingBuffer.subarray(bodyStart, bodyStart + length).toString('utf8');
+    incomingBuffer = incomingBuffer.subarray(bodyStart + length);
     try { handleRpcMessage(JSON.parse(bodyStr), outputChannel); } catch (err) {
       outputChannel.appendLine(`[Prady LSP Parse Error] ${err.message}`);
     }
@@ -420,7 +414,8 @@ function handleRpcMessage(msg, outputChannel) {
       if (d.code) diag.code = d.code;
       return diag;
     });
-    diagnosticCollection.set(targetUri, vsDiagnostics);
+    lspDiagnostics.set(uri, vsDiagnostics);
+    mergeDiagnostics(uri);
     return;
   }
   if (msg.id !== undefined && pendingRequests.has(msg.id)) {
@@ -464,24 +459,167 @@ let debounceTimer = null;
 const lspDiagnostics = new Map(); // uri -> Diagnostic[]
 // Per-doc diagnostics from import analysis
 const importDiagnostics = new Map(); // uri -> Diagnostic[]
+const runDiagnostics = new Map(); // uri -> entry uri -> Diagnostic[]
+const runDiagnosticFiles = new Map(); // entry uri -> diagnostic uri[]
 
 function mergeDiagnostics(uri) {
   const lsp = lspDiagnostics.get(uri) || [];
   const imp = importDiagnostics.get(uri) || [];
-  diagnosticCollection.set(vscode.Uri.parse(uri), [...lsp, ...imp]);
+  const run = [...(runDiagnostics.get(uri) || new Map()).values()].flat();
+  const seen = new Set();
+  const diagnostics = [...lsp, ...imp, ...run].filter((diag) => {
+    const key = `${diag.range.start.line}:${diag.range.start.character}:${diag.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  diagnosticCollection.set(vscode.Uri.parse(uri), diagnostics);
+}
+
+function clearRunDiagnostics(entryUri) {
+  const targets = new Set(runDiagnosticFiles.get(entryUri) || []);
+  targets.add(entryUri);
+  for (const [uri, entries] of runDiagnostics) {
+    if (entries.has(entryUri)) {
+      entries.delete(entryUri);
+      targets.add(uri);
+      if (entries.size === 0) runDiagnostics.delete(uri);
+    }
+  }
+  runDiagnosticFiles.delete(entryUri);
+
+  const otherEntries = runDiagnostics.get(entryUri);
+  if (otherEntries) {
+    for (const sourceUri of otherEntries.keys()) {
+      const files = runDiagnosticFiles.get(sourceUri);
+      if (files) {
+        files.delete(entryUri);
+        if (files.size === 0) runDiagnosticFiles.delete(sourceUri);
+      }
+    }
+    runDiagnostics.delete(entryUri);
+  }
+  for (const uri of targets) mergeDiagnostics(uri);
+}
+
+function setRunDiagnostics(entryUri, parsedDiagnostics) {
+  clearRunDiagnostics(entryUri);
+  const grouped = new Map();
+  for (const item of parsedDiagnostics) {
+    const uri = vscode.Uri.file(item.filePath).toString();
+    const range = new vscode.Range(
+      item.startLine,
+      item.startCharacter,
+      item.endLine,
+      Math.max(item.endCharacter, item.startCharacter + 1)
+    );
+    const diagnostic = new vscode.Diagnostic(
+      range,
+      item.message,
+      item.severity === 'warning' ? vscode.DiagnosticSeverity.Warning : vscode.DiagnosticSeverity.Error
+    );
+    diagnostic.source = 'prady';
+    diagnostic.code = item.code || (item.message.toLowerCase().startsWith('runtime error') ? 'PRADY_RUNTIME' : 'PRADY_COMPILE');
+    if (!grouped.has(uri)) grouped.set(uri, []);
+    grouped.get(uri).push(diagnostic);
+  }
+
+  const targets = new Set([entryUri, ...grouped.keys()]);
+  runDiagnosticFiles.set(entryUri, targets);
+  for (const uri of targets) {
+    const diagnostics = grouped.get(uri);
+    if (diagnostics && diagnostics.length > 0) {
+      if (!runDiagnostics.has(uri)) runDiagnostics.set(uri, new Map());
+      runDiagnostics.get(uri).set(entryUri, diagnostics);
+    }
+  }
+  for (const uri of targets) mergeDiagnostics(uri);
+}
+
+let workspaceDeclarationsPromise = null;
+
+async function getWorkspaceDeclarations(currentDocument) {
+  if (!workspaceDeclarationsPromise) {
+    workspaceDeclarationsPromise = (async () => {
+      const files = await vscode.workspace.findFiles('**/*.pr', '**/{target,node_modules,.git}/**', 500);
+      const declarations = [];
+      for (const uri of files) {
+        try {
+          const text = await fs.promises.readFile(uri.fsPath, 'utf8');
+          for (const declaration of extractWorkspaceDeclarations(text)) {
+            declarations.push({ ...declaration, uri, source: text });
+          }
+        } catch (err) {
+          console.error(`Prady: unable to read ${uri.fsPath}: ${err.message}`);
+        }
+      }
+      return declarations;
+    })().catch((err) => {
+      workspaceDeclarationsPromise = null;
+      throw err;
+    });
+  }
+
+  const declarations = (await workspaceDeclarationsPromise).filter(
+    (declaration) => declaration.uri.toString() !== currentDocument.uri.toString()
+  );
+  for (const openDocument of vscode.workspace.textDocuments) {
+    if (openDocument.languageId !== 'prady' || openDocument.uri.toString() === currentDocument.uri.toString()) continue;
+    for (const declaration of extractWorkspaceDeclarations(openDocument.getText())) {
+      declarations.push({ ...declaration, uri: openDocument.uri, source: openDocument.getText() });
+    }
+  }
+  return [
+    ...declarations,
+    ...extractWorkspaceDeclarations(currentDocument.getText()).map((declaration) => ({
+      ...declaration,
+      uri: currentDocument.uri,
+      source: currentDocument.getText(),
+    })),
+  ];
+}
+
+function detectUnresolvedImports(document) {
+  const diagnostics = [];
+  const importPattern = /^\s*import\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*;/gm;
+  let match;
+  while ((match = importPattern.exec(document.getText()))) {
+    const segments = match[1].split('.');
+    if (segments[0] === 'std') continue;
+    const baseDirectory = path.dirname(document.uri.fsPath);
+    const relativePath = path.join(...segments) + '.pr';
+    const candidates = [
+      path.resolve(baseDirectory, relativePath),
+      path.resolve(baseDirectory, 'src', relativePath),
+    ];
+    if (candidates.some((candidate) => fs.existsSync(candidate))) continue;
+
+    const start = document.positionAt(match.index + match[0].indexOf(match[1]));
+    const end = document.positionAt(match.index + match[0].indexOf(match[1]) + match[1].length);
+    const diagnostic = new vscode.Diagnostic(
+      new vscode.Range(start, end),
+      `Cannot resolve imported module '${match[1]}'. Expected '${relativePath.replace(/\\/g, '/')}'.`,
+      vscode.DiagnosticSeverity.Error
+    );
+    diagnostic.source = 'prady';
+    diagnostic.code = 'E0101';
+    diagnostics.push(diagnostic);
+  }
+  return diagnostics;
 }
 
 function runImportAnalysis(document) {
   if (document.languageId !== 'prady') return;
   const uri = document.uri.toString();
   const unused = detectUnusedImports(document);
-  const missing = detectMissingImports(document);
-  importDiagnostics.set(uri, [...unused, ...missing]);
+  importDiagnostics.set(uri, [...unused, ...detectUnresolvedImports(document)]);
   mergeDiagnostics(uri);
 }
 
 function notifyDocumentChange(document, outputChannel) {
   if (document.languageId !== 'prady') return;
+  const uri = document.uri.toString();
+  clearRunDiagnostics(uri);
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     const uriStr = document.uri.toString();
@@ -503,31 +641,76 @@ function runCliLint(document, outputChannel) {
   const cli = findCliBinary();
   const filePath = document.uri.fsPath;
   if (!fs.existsSync(filePath)) return;
-  cp.exec(`"${cli}" check "${filePath}"`, (err, stdout, stderr) => {
-    const combined = (stdout || '') + '\n' + (stderr || '');
-    const diags = [];
-    const regex = /(error|warning)(?:\[([A-Z0-9]+)\])?:\s*(.*?)\r?\n\s*-->\s*(.*?):(\d+):(\d+)/g;
-    let match;
-    while ((match = regex.exec(combined)) !== null) {
-      const isError = match[1] === 'error';
-      const code = match[2];
-      const message = match[3];
-      const line = Math.max(0, parseInt(match[5], 10) - 1);
-      const col = Math.max(0, parseInt(match[6], 10) - 1);
-      const range = new vscode.Range(line, col, line, col + 5);
-      const diag = new vscode.Diagnostic(range, message, isError ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning);
-      diag.source = 'prady';
-      if (code) diag.code = code;
-      diags.push(diag);
+  outputChannel.appendLine(`$ prady check "${filePath}"`);
+  cp.execFile(cli, ['check', filePath], { cwd: path.dirname(filePath) }, (err, stdout, stderr) => {
+    const output = `${stdout || ''}${stderr ? `${stdout ? '\n' : ''}${stderr}` : ''}`;
+    if (output) outputChannel.append(output);
+    if (err && !stdout && !stderr) {
+      outputChannel.appendLine(`[Prady check failed] ${err.message}`);
+      return;
     }
-    lspDiagnostics.set(document.uri.toString(), diags);
-    mergeDiagnostics(document.uri.toString());
+    setRunDiagnostics(document.uri.toString(), parseCliDiagnostics(output));
   });
+}
+
+async function runPradyFile(document, outputChannel) {
+  if (document.isDirty && !(await document.save())) return;
+  const cli = findCliBinary();
+  const filePath = document.uri.fsPath;
+  outputChannel.clear();
+  outputChannel.appendLine(`$ prady run "${filePath}"`);
+  const writeEmitter = new vscode.EventEmitter();
+  const closeEmitter = new vscode.EventEmitter();
+  let child = null;
+  let output = '';
+  const uri = document.uri.toString();
+
+  const pty = {
+    onDidWrite: writeEmitter.event,
+    onDidClose: closeEmitter.event,
+    open() {
+      child = cp.spawn(cli, ['run', filePath], {
+        cwd: path.dirname(filePath),
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+      const forward = (chunk) => {
+        const text = chunk.toString('utf8');
+        output += text;
+        outputChannel.append(text);
+        writeEmitter.fire(text.replace(/\r?\n/g, '\r\n'));
+      };
+      child.stdout.on('data', forward);
+      child.stderr.on('data', forward);
+      child.on('error', (err) => {
+        const message = `Prady could not run this file: ${err.message}`;
+        outputChannel.appendLine(message);
+        writeEmitter.fire(`${message}\r\n`);
+        vscode.window.showErrorMessage(message);
+      });
+      child.on('close', (code) => {
+        setRunDiagnostics(uri, parseCliDiagnostics(output));
+        closeEmitter.fire(code === null ? undefined : code);
+      });
+    },
+    close() {
+      if (child && !child.killed) child.kill();
+      writeEmitter.dispose();
+      closeEmitter.dispose();
+    },
+    handleInput(data) {
+      if (child && child.stdin.writable) child.stdin.write(data);
+    },
+  };
+
+  const terminal = vscode.window.createTerminal({ name: 'Prady Run', pty });
+  terminal.show(true);
 }
 
 // ─── activate ────────────────────────────────────────────────────────────────
 
 function activate(context) {
+  extensionDirectory = context.extensionPath;
   const outputChannel = vscode.window.createOutputChannel('Prady Language Server');
   diagnosticCollection = vscode.languages.createDiagnosticCollection('prady');
   context.subscriptions.push(diagnosticCollection, outputChannel);
@@ -542,29 +725,37 @@ function activate(context) {
         sendRpc('textDocument/didOpen', {
           textDocument: { uri: doc.uri.toString(), languageId: 'prady', version: doc.version, text: doc.getText() },
         });
-      } else {
-        runCliLint(doc, outputChannel);
       }
+      runCliLint(doc, outputChannel);
       runImportAnalysis(doc);
     }),
     vscode.workspace.onDidChangeTextDocument((e) => notifyDocumentChange(e.document, outputChannel)),
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (doc.languageId !== 'prady') return;
+      workspaceDeclarationsPromise = null;
       if (lspProcess) sendRpc('textDocument/didSave', { textDocument: { uri: doc.uri.toString() } });
-      else runCliLint(doc, outputChannel);
+      for (const openDocument of vscode.workspace.textDocuments) {
+        if (openDocument.languageId === 'prady') runCliLint(openDocument, outputChannel);
+      }
       runImportAnalysis(doc);
     }),
     vscode.workspace.onDidCloseTextDocument((doc) => {
+      clearRunDiagnostics(doc.uri.toString());
       diagnosticCollection.delete(doc.uri);
       importDiagnostics.delete(doc.uri.toString());
       lspDiagnostics.delete(doc.uri.toString());
       if (lspProcess && doc.languageId === 'prady') sendRpc('textDocument/didClose', { textDocument: { uri: doc.uri.toString() } });
-    })
+    }),
+    vscode.workspace.onDidCreateFiles(() => { workspaceDeclarationsPromise = null; }),
+    vscode.workspace.onDidDeleteFiles(() => { workspaceDeclarationsPromise = null; })
   );
 
   // Trigger on already-open documents
   vscode.workspace.textDocuments.forEach((doc) => {
-    if (doc.languageId === 'prady') notifyDocumentChange(doc, outputChannel);
+    if (doc.languageId === 'prady') {
+      notifyDocumentChange(doc, outputChannel);
+      runCliLint(doc, outputChannel);
+    }
   });
 
   // ─── Hover ────────────────────────────────────────────────────────────────
@@ -622,6 +813,33 @@ function activate(context) {
         async provideCompletionItems(document, position, _token, context) {
           const linePrefix = document.lineAt(position).text.substring(0, position.character);
           const items = [];
+          const source = document.getText();
+          const cursorOffset = document.offsetAt(position);
+
+          // ── Instance and class member completions ──────────────────────────
+          const receiverMatch = linePrefix.match(/\b([A-Za-z_]\w*)\.$/);
+          if (receiverMatch) {
+            const receiver = receiverMatch[1];
+            const declarations = await getWorkspaceDeclarations(document);
+            const receiverType = inferReceiverType(source, receiver, cursorOffset)
+              || (declarations.some((declaration) => declaration.name === receiver) ? receiver : null);
+            if (receiverType) {
+              const typeDeclaration = declarations.find((declaration) => declaration.name === receiverType);
+              const memberSource = typeDeclaration ? typeDeclaration.source : source;
+              const members = getMemberSignatures(memberSource, receiverType, cursorOffset);
+              if (members.length > 0) {
+                return members.map((member) => {
+                  const kind = member.kind === 'field'
+                    ? vscode.CompletionItemKind.Field
+                    : vscode.CompletionItemKind.Method;
+                  const item = new vscode.CompletionItem(member.name, kind);
+                  item.detail = member.signature;
+                  item.sortText = `0${member.name}`;
+                  return item;
+                });
+              }
+            }
+          }
 
           // ── Dot-access completions: "module." ──────────────────────────────
           const dotMatch = linePrefix.match(/\b(\w+)\.$/);
@@ -655,16 +873,45 @@ function activate(context) {
           for (const { module, member } of ALL_MEMBERS) {
             if (!member.name.toLowerCase().startsWith(typedWord) && typedWord.length > 0) continue;
 
-            const item = new vscode.CompletionItem(member.name, vscode.CompletionItemKind.Function);
+            const kind = member.kind === 'class'
+              ? vscode.CompletionItemKind.Class
+              : vscode.CompletionItemKind.Function;
+            const item = new vscode.CompletionItem(member.name, kind);
             item.detail = member.sig;
-            item.documentation = new vscode.MarkdownString(`${member.doc}\n\nFrom module \`${module}\``);
-            item.sortText = '1' + module + member.name;
+            item.documentation = new vscode.MarkdownString(
+              module ? `${member.doc}\n\nFrom module \`${module}\`` : member.doc
+            );
+            item.sortText = `1${module || ''}${member.name}`;
 
-            if (!isImported(document, module)) {
+            if (module && !isImported(document, module)) {
               item.additionalTextEdits = [buildImportEdit(document, module)];
               item.detail += `  ← auto-import: ${module}`;
             }
 
+            items.push(item);
+          }
+
+          // Add declarations from other .pr files, with a matching import edit.
+          const declarations = await getWorkspaceDeclarations(document);
+          for (const declaration of declarations) {
+            if (declaration.uri.toString() === document.uri.toString()) continue;
+            if (typedWord && !declaration.name.toLowerCase().startsWith(typedWord)) continue;
+            if (declaration.kind === 'fn' && !/^[a-z_]/.test(declaration.name)) continue;
+            const modulePath = modulePathFor(document.uri.fsPath, declaration.uri.fsPath);
+            if (!modulePath || isImported(document, modulePath)) continue;
+
+            const kind = declaration.kind === 'fn'
+              ? vscode.CompletionItemKind.Function
+              : declaration.kind === 'class'
+                ? vscode.CompletionItemKind.Class
+                : declaration.kind === 'struct'
+                  ? vscode.CompletionItemKind.Struct
+                  : vscode.CompletionItemKind.TypeParameter;
+            const item = new vscode.CompletionItem(declaration.name, kind);
+            item.detail = `${declaration.signature}  [auto-import: ${modulePath}]`;
+            item.documentation = new vscode.MarkdownString(`From \`${path.relative(path.dirname(document.uri.fsPath), declaration.uri.fsPath)}\``);
+            item.sortText = `0${declaration.name}`;
+            item.additionalTextEdits = [buildImportEdit(document, modulePath)];
             items.push(item);
           }
 
@@ -707,29 +954,40 @@ function activate(context) {
     )
   );
 
+  context.subscriptions.push(
+    vscode.languages.registerDocumentFormattingEditProvider('prady', {
+      async provideDocumentFormattingEdits(document) {
+        const cli = findCliBinary();
+        const temporaryFile = path.join(
+          os.tmpdir(),
+          `prady-format-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.pr`
+        );
+        try {
+          await fs.promises.writeFile(temporaryFile, document.getText(), 'utf8');
+          await new Promise((resolve, reject) => {
+            cp.execFile(cli, ['fmt', temporaryFile], { cwd: path.dirname(document.uri.fsPath) }, (error) => {
+              if (error) reject(error);
+              else resolve();
+            });
+          });
+          const formatted = await fs.promises.readFile(temporaryFile, 'utf8');
+          return [new vscode.TextEdit(
+            new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+            formatted
+          )];
+        } finally {
+          await fs.promises.rm(temporaryFile, { force: true });
+        }
+      },
+    })
+  );
+
   // ─── Code Action Provider (quick-fix: add missing import) ─────────────────
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider('prady', {
       provideCodeActions(document, range, context) {
         const actions = [];
         for (const diag of context.diagnostics) {
-          if (diag.code === 'E0100') {
-            // Extract module name from message
-            const match = diag.message.match(/module '(\w+)'/);
-            if (!match) continue;
-            const module = match[1];
-
-            const fix = new vscode.CodeAction(
-              `Add 'import ${module};' at the top`,
-              vscode.CodeActionKind.QuickFix
-            );
-            fix.edit = new vscode.WorkspaceEdit();
-            fix.edit.insert(document.uri, new vscode.Position(0, 0), importLineFor(module));
-            fix.diagnostics = [diag];
-            fix.isPreferred = true;
-            actions.push(fix);
-          }
-
           if (diag.code === 'W0001') {
             // Remove unused import
             const match = diag.message.match(/import '(\w+)'/);
@@ -756,7 +1014,7 @@ function activate(context) {
 
   // ─── Status Bar ───────────────────────────────────────────────────────────
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
-  statusBar.text = '$(symbol-keyword) Prady v1.0.0';
+  statusBar.text = '$(symbol-keyword) Prady v1.0.2';
   statusBar.tooltip = 'Prady Language Server active — Click to see output';
   statusBar.command = 'prady.showOutput';
   statusBar.show();
@@ -764,21 +1022,17 @@ function activate(context) {
 
   // ─── Commands ─────────────────────────────────────────────────────────────
   context.subscriptions.push(
-    vscode.commands.registerCommand('prady.runFile', () => {
+    vscode.commands.registerCommand('prady.runFile', async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
-      const cli = findCliBinary();
-      const terminal = vscode.window.createTerminal('Prady Run');
-      terminal.show();
-      terminal.sendText(`"${cli}" run "${editor.document.uri.fsPath}"`);
+      await runPradyFile(editor.document, outputChannel);
     }),
-    vscode.commands.registerCommand('prady.checkFile', () => {
+    vscode.commands.registerCommand('prady.checkFile', async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
-      const cli = findCliBinary();
-      const terminal = vscode.window.createTerminal('Prady Check');
-      terminal.show();
-      terminal.sendText(`"${cli}" check "${editor.document.uri.fsPath}"`);
+      if (editor.document.isDirty && !(await editor.document.save())) return;
+      runCliLint(editor.document, outputChannel);
+      outputChannel.show(true);
     }),
     vscode.commands.registerCommand('prady.showAst', () => {
       const editor = vscode.window.activeTextEditor;

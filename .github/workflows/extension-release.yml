@@ -25,6 +25,12 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install extension dependencies
+        run: npm ci
+
+      - name: Run extension tests
+        run: npm test
+
       - name: Install vsce and ovsx
         run: npm install -g @vscode/vsce ovsx
 
@@ -53,8 +59,17 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install extension dependencies
+        run: npm ci
+
       - name: Install vsce and ovsx
         run: npm install -g @vscode/vsce ovsx
+
+      - name: Download packaged extension
+        uses: actions/download-artifact@v4
+        with:
+          name: prady-lang-vsix
+          path: .
 
       # Secrets needed:
       #   VSCE_PAT   — Personal Access Token from https://dev.azure.com (Full Access, Marketplace scope)

@@ -2,7 +2,7 @@
   "name": "prady-lang",
   "displayName": "Prady Language",
   "description": "Full IDE support for Prady (.pr) — diagnostics, go-to-definition (Ctrl+Click), hover, auto-complete, symbols, run & check commands",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "publisher": "technopradyumn",
   "license": "MIT OR Apache-2.0",
   "icon": "icon.png",
@@ -16,8 +16,9 @@
   "main": "./extension.js",
   "scripts": {
     "package": "vsce package",
+    "test": "node --test",
     "publish": "vsce publish",
-    "publish-ovsx": "ovsx publish prady-lang-1.0.0.vsix -p"
+    "publish-ovsx": "ovsx publish prady-lang-1.0.2.vsix -p"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -83,6 +84,14 @@
         "icon": "$(list-ordered)"
       }
     ],
+    "keybindings": [
+      {
+        "command": "prady.runFile",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "editorTextFocus && resourceLangId == prady"
+      }
+    ],
     "menus": {
       "editor/title": [
         {
@@ -126,16 +135,6 @@
           "type": "string",
           "default": "",
           "description": "Path to the prady-lsp binary (leave empty for auto-detection)"
-        },
-        "prady.enableInlayHints": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show inlay type hints for let bindings"
-        },
-        "prady.formatOnSave": {
-          "type": "boolean",
-          "default": false,
-          "description": "Run formatter on save (when formatter is available)"
         }
       }
     },

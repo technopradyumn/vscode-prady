@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Prady</title>
+  <defs>
+    <linearGradient id="mark" x1="96" y1="416" x2="416" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#818cf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0b1220"/>
+  <path d="M164 405V107h160a82 82 0 0 1 0 164H164" fill="none" stroke="url(#mark)" stroke-linecap="square" stroke-linejoin="round" stroke-width="48"/>
+  <path d="M265 405h106" fill="none" stroke="#e2e8f0" stroke-linecap="round" stroke-width="25"/>
+  <circle cx="400" cy="405" r="13" fill="#38bdf8"/>
+</svg>
