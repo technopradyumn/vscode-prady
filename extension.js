@@ -1,4 +1,4 @@
-// Prady Language Extension for VS Code (v1.0.2)
+// Prady Language Extension for VS Code (v1.0.3)
 // Real-time diagnostics, go-to-definition, hover, autocomplete, symbols, and CLI runner.
 // Auto-import on completion selection, unused-import diagnostics, dot-access member completions.
 
@@ -11,6 +11,7 @@ const {
   extractWorkspaceDeclarations,
   getMemberSignatures,
   inferReceiverType,
+  importIsAvailable,
   modulePathFor,
   parseCliDiagnostics,
   unresolvedImportMessage,
@@ -585,14 +586,10 @@ function detectUnresolvedImports(document) {
   const importPattern = /^\s*import\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*;/gm;
   let match;
   while ((match = importPattern.exec(document.getText()))) {
-    const segments = match[1].split('.');
-    const baseDirectory = path.dirname(document.uri.fsPath);
-    const relativePath = path.join(...segments) + '.pr';
-    const candidates = [
-      path.resolve(baseDirectory, relativePath),
-      path.resolve(baseDirectory, 'src', relativePath),
-    ];
-    if (candidates.some((candidate) => fs.existsSync(candidate))) continue;
+    const relativePath = path.join(...match[1].split('.')) + '.pr';
+    const workspaceRoots = (vscode.workspace.workspaceFolders || [])
+      .map((folder) => folder.uri.fsPath);
+    if (importIsAvailable(document.uri.fsPath, match[1], workspaceRoots)) continue;
 
     const start = document.positionAt(match.index + match[0].indexOf(match[1]));
     const end = document.positionAt(match.index + match[0].indexOf(match[1]) + match[1].length);
@@ -1014,7 +1011,7 @@ function activate(context) {
 
   // ─── Status Bar ───────────────────────────────────────────────────────────
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
-  statusBar.text = '$(symbol-keyword) Prady v1.0.2';
+  statusBar.text = '$(symbol-keyword) Prady v1.0.3';
   statusBar.tooltip = 'Prady Language Server active — Click to see output';
   statusBar.command = 'prady.showOutput';
   statusBar.show();

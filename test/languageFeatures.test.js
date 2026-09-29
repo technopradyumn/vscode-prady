@@ -1,11 +1,14 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 
 const {
   extractWorkspaceDeclarations,
   getMemberSignatures,
   inferReceiverType,
+  importIsAvailable,
   modulePathFor,
   parseCliDiagnostics,
   unresolvedImportMessage,
@@ -88,6 +91,37 @@ test('auto-import path is relative to the importing source file', () => {
 test('unresolved imports explain missing source modules and unavailable std modules', () => {
   assert.match(unresolvedImportMessage('models.user', 'models/user.pr'), /Expected 'models\/user\.pr'/);
   assert.match(unresolvedImportMessage('std.io', 'std/io.pr'), /not shipped by this compiler/);
+});
+
+test('import resolution includes the project src directory for nested entry files', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'prady-import-'));
+  try {
+    const entryDirectory = path.join(root, 'examples');
+    fs.mkdirSync(path.join(root, '.git'));
+    fs.mkdirSync(path.join(root, 'src', 'models'), { recursive: true });
+    fs.mkdirSync(entryDirectory);
+    const entryFile = path.join(entryDirectory, 'main.pr');
+    fs.writeFileSync(path.join(root, 'src', 'models', 'Hai.pr'), '');
+
+    assert.equal(importIsAvailable(entryFile, 'models.Hai', [root]), true);
+    assert.equal(importIsAvailable(entryFile, 'Missing', [root]), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('import resolution recognizes nested sibling modules auto-loaded by the CLI', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'prady-import-'));
+  try {
+    const entryDirectory = path.join(root, 'examples');
+    fs.mkdirSync(path.join(entryDirectory, 'modules'), { recursive: true });
+    const entryFile = path.join(entryDirectory, 'main.pr');
+    fs.writeFileSync(path.join(entryDirectory, 'modules', 'hai.pr'), '');
+
+    assert.equal(importIsAvailable(entryFile, 'Hai'), true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('CLI parser converts compile and runtime locations into editor diagnostics', () => {

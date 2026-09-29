@@ -6,7 +6,7 @@
 
 **Full IDE support for the Prady Programming Language (`.pr`)**
 
-[![Version](https://img.shields.io/badge/version-1.0.2-blue?style=flat-square)](https://github.com/technopradyumn/vscode-prady/releases)
+[![Version](https://img.shields.io/badge/version-1.0.3-blue?style=flat-square)](https://github.com/technopradyumn/vscode-prady/releases)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green?style=flat-square)](LICENSE)
 [![Website](https://img.shields.io/badge/website-pradylang.vercel.app-indigo?style=flat-square)](https://pradylang.vercel.app)
 
@@ -106,7 +106,7 @@ Format with **Format Document**. To format when saving, configure VS Code's stan
 
 The current compiler does not implement full static type checking. The extension reports diagnostics the parser/compiler actually emit and cannot detect every undefined name or type mismatch before execution. It only proposes project imports that map to files it can resolve; documented standard-library namespaces without source modules are not invented as auto-imports.
 
-For the latest diagnostics, completions, formatting, and runner fixes, install **Prady Language 1.0.2 or newer** and restart VS Code. The extension can use the bundled CLI when a matching platform binary is present; otherwise install Prady separately or set `prady.executablePath`.
+For the latest diagnostics, completions, formatting, and runner fixes, install **Prady Language 1.0.3 or newer** and restart VS Code. The extension can use the bundled CLI when a matching platform binary is present; otherwise install Prady separately or set `prady.executablePath`.
 
 ---
 

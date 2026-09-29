@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 const BUILTIN_METHODS = {
   Array: [
@@ -281,6 +282,73 @@ function modulePathFor(fromFile, targetFile) {
   return segments.join('.');
 }
 
+function findPrFiles(directory, maxDepth, results = []) {
+  if (maxDepth === 0) return results;
+
+  let entries;
+  try {
+    entries = fs.readdirSync(directory, { withFileTypes: true });
+  } catch {
+    return results;
+  }
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (!entry.name.startsWith('.') && entry.name !== 'target' && entry.name !== 'node_modules') {
+        findPrFiles(entryPath, maxDepth - 1, results);
+      }
+    } else if (entry.isFile() && path.extname(entry.name) === '.pr') {
+      results.push(entryPath);
+    }
+  }
+  return results;
+}
+
+function findProjectRoot(startDirectory) {
+  let current = startDirectory;
+  while (current) {
+    if (fs.existsSync(path.join(current, 'prady.toml')) || fs.existsSync(path.join(current, '.git'))) {
+      return current;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
+
+function importIsAvailable(documentPath, modulePath, workspaceRoots = []) {
+  if (modulePath.split('.')[0] === 'std') return false;
+
+  const baseDirectory = path.dirname(documentPath);
+  const projectRoot = findProjectRoot(baseDirectory);
+  const projectSourceDirectories = [
+    ...(projectRoot ? [path.join(projectRoot, 'src')] : []),
+    ...workspaceRoots.map((root) => path.join(root, 'src')),
+  ];
+  const sourceDirectories = [
+    [baseDirectory, 2],
+    ...projectSourceDirectories.map((directory) => [directory, 3]),
+  ];
+  const segments = modulePath.split('.');
+  const relativePath = path.join(...segments) + '.pr';
+  const candidates = [
+    path.resolve(baseDirectory, relativePath),
+    path.resolve(baseDirectory, 'src', relativePath),
+    ...projectSourceDirectories.map((directory) => path.resolve(directory, relativePath)),
+  ];
+  if (candidates.some((candidate) => fs.existsSync(candidate))) return true;
+
+  const moduleName = segments.at(-1).toLowerCase();
+  for (const [directory, depth] of sourceDirectories) {
+    for (const file of findPrFiles(directory, depth)) {
+      if (path.basename(file, '.pr').toLowerCase() === moduleName) return true;
+    }
+  }
+  return false;
+}
+
 function normalizeDiagnosticPath(filePath) {
   const resolved = path.resolve(filePath);
   return resolved.startsWith('\\\\?\\') ? resolved.slice(4) : resolved;
@@ -322,6 +390,7 @@ module.exports = {
   extractWorkspaceDeclarations,
   getMemberSignatures,
   inferReceiverType,
+  importIsAvailable,
   modulePathFor,
   parseCliDiagnostics,
   unresolvedImportMessage,
