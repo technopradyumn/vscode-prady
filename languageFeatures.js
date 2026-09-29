@@ -286,6 +286,13 @@ function normalizeDiagnosticPath(filePath) {
   return resolved.startsWith('\\\\?\\') ? resolved.slice(4) : resolved;
 }
 
+function unresolvedImportMessage(modulePath, expectedPath) {
+  if (modulePath.split('.')[0] === 'std') {
+    return `Standard-library module '${modulePath}' is not shipped by this compiler. Use implemented built-ins or add a local .pr module.`;
+  }
+  return `Cannot resolve imported module '${modulePath}'. Expected '${expectedPath.replace(/\\/g, '/')}'.`;
+}
+
 function parseCliDiagnostics(output) {
   const plain = output.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '');
   const arrows = /^\s*-->\s+(.+):(\d+):(\d+)(?:-(\d+):(\d+))?\s*$/gm;
@@ -317,4 +324,5 @@ module.exports = {
   inferReceiverType,
   modulePathFor,
   parseCliDiagnostics,
+  unresolvedImportMessage,
 };

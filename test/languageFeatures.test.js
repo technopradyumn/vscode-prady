@@ -8,6 +8,7 @@ const {
   inferReceiverType,
   modulePathFor,
   parseCliDiagnostics,
+  unresolvedImportMessage,
 } = require('../languageFeatures');
 
 test('workspace indexing returns top-level classes and functions, not nested methods', () => {
@@ -82,6 +83,11 @@ test('auto-import path is relative to the importing source file', () => {
     modulePathFor(path.join('project', 'src', 'main.pr'), path.join('project', 'shared', 'user.pr')),
     null
   );
+});
+
+test('unresolved imports explain missing source modules and unavailable std modules', () => {
+  assert.match(unresolvedImportMessage('models.user', 'models/user.pr'), /Expected 'models\/user\.pr'/);
+  assert.match(unresolvedImportMessage('std.io', 'std/io.pr'), /not shipped by this compiler/);
 });
 
 test('CLI parser converts compile and runtime locations into editor diagnostics', () => {

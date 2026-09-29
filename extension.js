@@ -13,6 +13,7 @@ const {
   inferReceiverType,
   modulePathFor,
   parseCliDiagnostics,
+  unresolvedImportMessage,
 } = require('./languageFeatures');
 
 let diagnosticCollection;
@@ -585,7 +586,6 @@ function detectUnresolvedImports(document) {
   let match;
   while ((match = importPattern.exec(document.getText()))) {
     const segments = match[1].split('.');
-    if (segments[0] === 'std') continue;
     const baseDirectory = path.dirname(document.uri.fsPath);
     const relativePath = path.join(...segments) + '.pr';
     const candidates = [
@@ -598,7 +598,7 @@ function detectUnresolvedImports(document) {
     const end = document.positionAt(match.index + match[0].indexOf(match[1]) + match[1].length);
     const diagnostic = new vscode.Diagnostic(
       new vscode.Range(start, end),
-      `Cannot resolve imported module '${match[1]}'. Expected '${relativePath.replace(/\\/g, '/')}'.`,
+      unresolvedImportMessage(match[1], relativePath),
       vscode.DiagnosticSeverity.Error
     );
     diagnostic.source = 'prady';

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="prady-logo.svg" width="80" alt="Prady Language Logo" />
+<img src="icon.png" width="80" alt="Prady Language Logo" />
 
 # Prady Language Support for VS Code
 
