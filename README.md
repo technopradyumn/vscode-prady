@@ -25,7 +25,7 @@
 | Feature | Details |
 |---|---|
 | 🎨 **Syntax Highlighting** | Keywords, types, functions, comments, decorators (`@test`), architecture blocks (`architecture`, `layer`, `spec`) |
-| ⚡ **Code Runner** | Click the ▶ button to run `.pr` files in an interactive terminal; output and runtime errors also appear in editor diagnostics |
+| ⚡ **Code Runner** | Click the ▶ button to run `.pr` files in an interactive terminal; `input()` reads from that terminal, while output and runtime errors appear in editor diagnostics |
 | 🔍 **Diagnostics** | Syntax/parser and unresolved local import diagnostics update while editing; save or run `Prady: Check File` to refresh compiler diagnostics |
 | 🔵 **LSP Integration** | Hover and go-to-definition where supported, workspace class/function completions, local member suggestions, and relative auto-imports |
 | 🎨 **Formatting** | Run `Format Document` to use `prady fmt`; enable it on save with VS Code's `[prady]` editor setting |
@@ -86,6 +86,8 @@ Open the Command Palette (`Ctrl+Shift+P`) and search for:
 
 **Keyboard shortcuts:**
 - `Ctrl+Alt+N` — Run current `.pr` file
+
+Programs can read a line from the interactive terminal with `input()` or display a prompt with `input("Name: ")`.
 
 ---
 

@@ -2,7 +2,7 @@
   "name": "prady-lang",
   "displayName": "Prady Language",
   "description": "Full IDE support for Prady (.pr) — diagnostics, go-to-definition (Ctrl+Click), hover, auto-complete, symbols, run & check commands",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "technopradyumn",
   "license": "MIT OR Apache-2.0",
   "icon": "icon.png",
@@ -18,7 +18,7 @@
     "package": "vsce package",
     "test": "node --test",
     "publish": "vsce publish",
-    "publish-ovsx": "ovsx publish prady-lang-1.0.3.vsix -p"
+    "publish-ovsx": "ovsx publish prady-lang-1.0.4.vsix -p"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
