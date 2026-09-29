@@ -326,6 +326,8 @@ function findLspBinary(context) {
   if (fs.existsSync(bundled)) return bundled;
   const home = process.env.USERPROFILE || process.env.HOME || '';
   if (home) {
+    const pradyBin = path.join(home, '.prady', 'bin', binName);
+    if (fs.existsSync(pradyBin)) return pradyBin;
     const cargoBin = path.join(home, '.cargo', 'bin', binName);
     if (fs.existsSync(cargoBin)) return cargoBin;
   }
@@ -353,6 +355,8 @@ function findCliBinary() {
   if (userSetting && userSetting !== 'prady' && fs.existsSync(userSetting)) return userSetting;
   const home = process.env.USERPROFILE || process.env.HOME || '';
   if (home) {
+    const pradyBin = path.join(home, '.prady', 'bin', binName);
+    if (fs.existsSync(pradyBin)) return pradyBin;
     const cargoBin = path.join(home, '.cargo', 'bin', binName);
     if (fs.existsSync(cargoBin)) return cargoBin;
   }
