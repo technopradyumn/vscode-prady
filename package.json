@@ -16,7 +16,8 @@
   "main": "./extension.js",
   "scripts": {
     "package": "vsce package",
-    "publish": "vsce publish"
+    "publish": "vsce publish",
+    "publish-ovsx": "ovsx publish prady-lang-1.0.0.vsix -p"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -75,6 +76,11 @@
       {
         "command": "prady.showOutput",
         "title": "Prady: Show LSP Output"
+      },
+      {
+        "command": "prady.organizeImports",
+        "title": "Prady: Organize Imports",
+        "icon": "$(list-ordered)"
       }
     ],
     "menus": {
